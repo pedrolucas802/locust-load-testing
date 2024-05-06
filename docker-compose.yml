@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  nginx:
+    image: nginx
+    ports:
+      - 80:80
+    volumes:
+      - ./nginx/:/etc/nginx
+    depends_on:
+      - wordpress
+
+  wordpress:
+    image: wordpress:latest
+    deploy:
+      mode: replicated
+      replicas: 3
+    environment:
+      WORDPRESS_DB_USER: usr-wordpress
+      WORDPRESS_DB_PASSWORD: pwd-wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_HOST: wordpress-mysql
+    depends_on:
+      - wordpress-mysql
+    volumes:
+      - ./html:/var/www/html
+
+  wordpress-mysql:
+    platform: linux/x86_64
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: usr-wordpress
+      MYSQL_PASSWORD: pwd-wordpress
+
+  master:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+    command: -f /mnt/locust/locustfile.py --master -H http://wordpress
+    depends_on:
+      - nginx
+      - wordpress
+
+  worker:
+    image: locustio/locust
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+    command: -f /mnt/locust/locustfile.py --worker --master-host master
+    depends_on:
+      - nginx
+      - wordpress
